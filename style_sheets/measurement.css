@@ -1,0 +1,16 @@
+/* 测量按钮的大小样式 */
+button.measurement-button {
+    width: 37px;
+    height: 28px;
+}
+
+/* 测量按钮的图片样式 */
+.measure-name {
+    display: block;
+    margin: 0 auto;
+    width: 100%;
+    position: relative;
+    top: -30%;
+    height: 15px;
+    margin-left: 10%;
+}

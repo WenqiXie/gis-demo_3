@@ -1,0 +1,8 @@
+{
+  "devDependencies": {
+    "bootstrap": "^3.3.7",
+    "fontawesome": "^4.7.2",
+    "openlayers": "^4.0.1",
+    "polyfill": "^0.1.0"
+  }
+}
