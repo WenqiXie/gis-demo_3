@@ -105,10 +105,10 @@
                         <option value="length">Length (LineString)</option>
                         <option value="area">Area (Polygon)</option>
                     </select>
-                    <!-- <label class="checkbox">
+                    <label class="checkbox">
                         <input type="checkbox" id="geodesic">
                         use geodesic measures
-                    </label> -->
+                    </label>
                 </form>
                 <!-- 标点 线 面 -->
                 <form class="form-inline">
@@ -120,6 +120,7 @@
                         <option value="LineString">LineString</option>
                         <option value="Polygon">Polygon</option>
                         <option value="Circle">Circle</option>
+                        <option value="none">none</option>
                     </select>
                 </form>
             </div>
@@ -171,14 +172,14 @@
             // Create the map.
             var map = new ol.Map({
                 layers: [
-                    new ol.layer.Tile({
-                        source: new ol.source.TileJSON({
-                            url: 'https://api.tiles.mapbox.com/v3/mapbox.natural-earth-hypso-bathy.json?secure',
-                            crossOrigin: 'anonymous'
-                        })
-                    }),
-                    raster
+                    // new ol.layer.Tile({
+                    //     source: new ol.source.TileJSON({
+                    //         url: 'https://api.tiles.mapbox.com/v3/mapbox.natural-earth-hypso-bathy.json?secure',
+                    //         crossOrigin: 'anonymous'
+                    //     })
+                    // }),
                     // vector,
+                    raster
                 ],
                 overlays: [overlay],
                 target: 'map',
@@ -225,27 +226,33 @@
             });
             featureOverlay.setMap(map);
 
-            var modify = new ol.interaction.Modify({
-                features: features,
-                // the SHIFT key must be pressed to delete vertices, so
-                // that new vertices can be drawn at the same position
-                // of existing vertices
-                deleteCondition: function(event) {
-                    return ol.events.condition.shiftKeyOnly(event) &&
-                    ol.events.condition.singleClick(event);
-                }
-            });
-            map.addInteraction(modify);
+            // var modify = new ol.interaction.Modify({
+            //     features: features,
+            //     // the SHIFT key must be pressed to delete vertices, so
+            //     // that new vertices can be drawn at the same position
+            //     // of existing vertices
+            //     deleteCondition: function(event) {
+            //         return ol.events.condition.shiftKeyOnly(event) &&
+            //         ol.events.condition.singleClick(event);
+            //     }
+            // });
+            // map.addInteraction(modify);
 
             var draw; // global so we can remove it later
             var typeSelect = e('#type');
 
             var addInteraction = function() {
-                draw = new ol.interaction.Draw({
+                if (typeSelect.value == "none") {
+                  map.removeInteraction(draw);
+                } else {
+
+                  draw = new ol.interaction.Draw({
                     features: features,
                     type: /** @type {ol.geom.GeometryType} */ (typeSelect.value)
-                });
-                map.addInteraction(draw);
+                  });
+                  console.log('typeSelect.value', typeSelect.value);
+                  map.addInteraction(draw);
+                }
             }
 
             // Handle change event.
@@ -258,219 +265,237 @@
 
         // 测量
 
-            // var wgs84Sphere = new ol.Sphere(6378137);
+            var wgs84Sphere = new ol.Sphere(6378137);
+
+            var source = new ol.source.Vector();
+
+
+
+            // Currently drawn feature.
+            var sketch;
+
+            // The help tooltip element.
+            var helpTooltipElement;
+
+            // Overlay to show the help messages.
+            var helpTooltip;
+
+            // The measure tooltip element.
+            var measureTooltipElement;
+
+            // Overlay to show the measurement.
+            var measureTooltip;
+
+            // Message to show when the user is drawing a polygon.
+            var continuePolygonMsg = 'Click to continue drawing the polygon';
+
+            // Message to show when the user is drawing a line.
+            var continueLineMsg = 'Click to continue drawing the line';
+
+            // Handle pointer move.
+            var pointerMoveHandler = function(evt) {
+              console.log('pointerMoveHandler');
+                if (evt.dragging) {
+                    return;
+                }
+                var helpMsg = 'Click to start drawing';
+
+                if (sketch) {
+                    var geom = (sketch.getGeometry());
+                    if (geom instanceof ol.geom.Polygon) {
+                        helpMsg = continuePolygonMsg;
+                    } else if (geom instanceof ol.geom.LineString) {
+                        helpMsg = continueLineMsg;
+                    }
+                }
+
+                helpTooltipElement.innerHTML = helpMsg;
+                helpTooltip.setPosition(evt.coordinate);
+
+                helpTooltipElement.classList.remove('hidden');
+            };
+            // 图层
+            var vector = new ol.layer.Vector({
+                source: source,
+                style: new ol.style.Style({
+                    fill: new ol.style.Fill({
+                    color: 'rgba(255, 255, 255, 0.2)'
+                }),
+                stroke: new ol.style.Stroke({
+                    color: '#ffcc33',
+                    width: 2
+                }),
+                image: new ol.style.Circle({
+                        radius: 7,
+                        fill: new ol.style.Fill({
+                            color: '#ffcc33'
+                        })
+                    })
+                })
+            });
             //
-            // var source = new ol.source.Vector();
-            //
-            //
-            //
-            // // Currently drawn feature.
-            // var sketch;
-            //
-            // // The help tooltip element.
-            // var helpTooltipElement;
-            //
-            // // Overlay to show the help messages.
-            // var helpTooltip;
-            //
-            // // The measure tooltip element.
-            // var measureTooltipElement;
-            //
-            // // Overlay to show the measurement.
-            // var measureTooltip;
-            //
-            // // Message to show when the user is drawing a polygon.
-            // var continuePolygonMsg = 'Click to continue drawing the polygon';
-            //
-            // // Message to show when the user is drawing a line.
-            // var continueLineMsg = 'Click to continue drawing the line';
-            //
-            // // Handle pointer move.
-            // var pointerMoveHandler = function(evt) {
-            //     if (evt.dragging) {
-            //         return;
-            //     }
-            //     var helpMsg = 'Click to start drawing';
-            //
-            //     if (sketch) {
-            //         var geom = (sketch.getGeometry());
-            //         if (geom instanceof ol.geom.Polygon) {
-            //             helpMsg = continuePolygonMsg;
-            //         } else if (geom instanceof ol.geom.LineString) {
-            //             helpMsg = continueLineMsg;
-            //         }
-            //     }
-            //
-            //     helpTooltipElement.innerHTML = helpMsg;
-            //     helpTooltip.setPosition(evt.coordinate);
-            //
-            //     helpTooltipElement.classList.remove('hidden');
-            // };
-            //
-            // var vector = new ol.layer.Vector({
-            //     source: source,
-            //     style: new ol.style.Style({
-            //         fill: new ol.style.Fill({
-            //         color: 'rgba(255, 255, 255, 0.2)'
-            //     }),
-            //     stroke: new ol.style.Stroke({
-            //         color: '#ffcc33',
-            //         width: 2
-            //     }),
-            //     image: new ol.style.Circle({
-            //             radius: 7,
-            //             fill: new ol.style.Fill({
-            //                 color: '#ffcc33'
-            //             })
-            //         })
-            //     })
-            // });
-            //
-            // map.on('pointermove', pointerMoveHandler);
-            //
-            // map.getViewport().addEventListener('mouseout', function() {
-            //     helpTooltipElement.classList.add('hidden');
-            // });
-            //
-            // var typeSelect = document.getElementById('type');
-            // var geodesicCheckbox = document.getElementById('geodesic');
-            //
-            // var draw; // global so we can remove it later
-            // // Format length output
-            // var formatLength = function(line) {
-            //       var length;
-            //       if (geodesicCheckbox.checked) {
-            //           var coordinates = line.getCoordinates();
-            //           length = 0;
-            //           var sourceProj = map.getView().getProjection();
-            //           for (var i = 0, ii = coordinates.length - 1; i < ii; ++i) {
-            //               var c1 = ol.proj.transform(coordinates[i], sourceProj, 'EPSG:4326');
-            //               var c2 = ol.proj.transform(coordinates[i + 1], sourceProj, 'EPSG:4326');
-            //               length += wgs84Sphere.haversineDistance(c1, c2);
-            //           }
-            //       } else {
-            //           length = Math.round(line.getLength() * 100) / 100;
-            //       }
-            //       var output;
-            //       if (length > 100) {
-            //           output = (Math.round(length / 1000 * 100) / 100) + ' ' + 'km';
-            //     } else {
-            //       output = (Math.round(length * 100) / 100) + ' ' + 'm';
-            //     }
-            //     return output;
-            // };
-            // // Format area output.
-            // var formatArea = function(polygon) {
-            //     var area;
-            //     if (geodesicCheckbox.checked) {
-            //         var sourceProj = map.getView().getProjection();
-            //         var geom = /** @type {ol.geom.Polygon} */(polygon.clone().transform(
-            //             sourceProj, 'EPSG:4326'));
-            //             var coordinates = geom.getLinearRing(0).getCoordinates();
-            //             area = Math.abs(wgs84Sphere.geodesicArea(coordinates));
-            //         } else {
-            //             area = polygon.getArea();
-            //         }
-            //         var output;
-            //         if (area > 10000) {
-            //             output = (Math.round(area / 1000000 * 100) / 100) + ' ' + 'km<sup>2</sup>';
-            //         } else {
-            //             output = (Math.round(area * 100) / 100) + ' ' + 'm<sup>2</sup>';
-            //         }
-            //         return output;
-            // };
-            //
-            // var addInteraction = function() {
-            //     var type = (typeSelect.value == 'area' ? 'Polygon' : 'LineString');
-            //     draw = new ol.interaction.Draw({
-            //         source: source,
-            //         type: /** @type {ol.geom.GeometryType} */ (type),
-            //         style: new ol.style.Style({
-            //               fill: new ol.style.Fill({
-            //                   color: 'rgba(255, 255, 255, 0.2)'
-            //               }),
-            //               stroke: new ol.style.Stroke({
-            //                   color: 'rgba(0, 0, 0, 0.5)',
-            //                   lineDash: [10, 10],
-            //                   width: 2
-            //               }),
-            //               image: new ol.style.Circle({
-            //                   radius: 5,
-            //                   stroke: new ol.style.Stroke({
-            //                       color: 'rgba(0, 0, 0, 0.7)'
-            //                   }),
-            //                   fill: new ol.style.Fill({
-            //                       color: 'rgba(255, 255, 255, 0.2)'
-            //                   })
-            //               })
-            //           })
-            //     });
-            //     map.addInteraction(draw);
-            //     createMeasureTooltip();
-            //     createHelpTooltip();
-            //     var listener;
-            //     draw.on('drawstart',
-            //             function(evt) {
-            //                 // set sketch
-            //                 sketch = evt.feature;
-            //                 var tooltipCoord = evt.coordinate;
-            //
-            //                 listener = sketch.getGeometry().on('change', function(evt) {
-            //                     var geom = evt.target;
-            //                     var output;
-            //                     if (geom instanceof ol.geom.Polygon) {
-            //                         output = formatArea(geom);
-            //                         tooltipCoord = geom.getInteriorPoint().getCoordinates();
-            //                     } else if (geom instanceof ol.geom.LineString) {
-            //                         output = formatLength(geom);
-            //                         tooltipCoord = geom.getLastCoordinate();
-            //                     }
-            //                     measureTooltipElement.innerHTML = output;
-            //                     measureTooltip.setPosition(tooltipCoord);
-            //                 });
-            //             }, this);
-            //     draw.on('drawend',
-            //             function() {
-            //                 measureTooltipElement.className = 'tooltip tooltip-static';
-            //                 measureTooltip.setOffset([0, -7]);
-            //                 // unset sketch
-            //                 sketch = null;
-            //                 // unset tooltip so that a new one can be created
-            //                 measureTooltipElement = null;
-            //                 createMeasureTooltip();
-            //                 ol.Observable.unByKey(listener);
-            //             }, this);
-            // }
-            //
-            //  // Creates a new help tooltip
-            //  var createHelpTooltip = function() {
-            //      if (helpTooltipElement) {
-            //          helpTooltipElement.parentNode.removeChild(helpTooltipElement);
-            //      }
-            //      helpTooltipElement = document.createElement('div');
-            //      helpTooltipElement.className = 'tooltip hidden';
-            //      helpTooltip = new ol.Overlay({
-            //          element: helpTooltipElement,
-            //          offset: [15, 0],
-            //          positioning: 'center-left'
-            //      });
-            //      map.addOverlay(helpTooltip);
-            //  }
-            //
-            // //  Creates a new measure tooltip
-            // var createMeasureTooltip = function() {
-            //     if (measureTooltipElement) {
-            //         measureTooltipElement.parentNode.removeChild(measureTooltipElement);
-            //     }
-            //     measureTooltipElement = document.createElement('div');
-            //     measureTooltipElement.className = 'tooltip tooltip-measure';
-            //     measureTooltip = new ol.Overlay({
-            //         element: measureTooltipElement,
-            //         offset: [0, -15],
-            //         positioning: 'bottom-center'
-            //     });
-            //     map.addOverlay(measureTooltip);
-            //   }
+            vector.setMap(map);
+
+
+            var geodesicCheckbox = document.getElementById('geodesic');
+
+            var kind = e('#kind');
+
+          // ************** 这段不用管 start ****************
+            // Format length output
+            var formatLength = function(line) {
+                  var length;
+                  if (geodesicCheckbox.checked) {
+                      var coordinates = line.getCoordinates();
+                      length = 0;
+                      var sourceProj = map.getView().getProjection();
+                      for (var i = 0, ii = coordinates.length - 1; i < ii; ++i) {
+                          var c1 = ol.proj.transform(coordinates[i], sourceProj, 'EPSG:4326');
+                          var c2 = ol.proj.transform(coordinates[i + 1], sourceProj, 'EPSG:4326');
+                          length += wgs84Sphere.haversineDistance(c1, c2);
+                      }
+                  } else {
+                      length = Math.round(line.getLength() * 100) / 100;
+                  }
+                  var output;
+                  if (length > 100) {
+                      output = (Math.round(length / 1000 * 100) / 100) + ' ' + 'km';
+                } else {
+                  output = (Math.round(length * 100) / 100) + ' ' + 'm';
+                }
+                return output;
+            };
+            // Format area output.
+            var formatArea = function(polygon) {
+                var area;
+                if (geodesicCheckbox.checked) {
+                    var sourceProj = map.getView().getProjection();
+                    var geom = /** @type {ol.geom.Polygon} */(polygon.clone().transform(
+                        sourceProj, 'EPSG:4326'));
+                        var coordinates = geom.getLinearRing(0).getCoordinates();
+                        area = Math.abs(wgs84Sphere.geodesicArea(coordinates));
+                    } else {
+                        area = polygon.getArea();
+                    }
+                    var output;
+                    if (area > 10000) {
+                        output = (Math.round(area / 1000000 * 100) / 100) + ' ' + 'km<sup>2</sup>';
+                    } else {
+                        output = (Math.round(area * 100) / 100) + ' ' + 'm<sup>2</sup>';
+                    }
+                    return output;
+            };
+
+          // ************** 这段不用管 end ****************
+
+          kind.addEventListener('change', function(event) {
+            // ************* 之后要修改的 **************
+            map.removeInteraction(draw);
+            console.log('kind  change');
+            // var target = event.target
+            console.log('this.value', this.value);
+            addInteraction1()
+
+            map.on('pointermove', pointerMoveHandler);
+            // 注意之后可能需要取消注册
+            map.getViewport().addEventListener('mouseout', function() {
+                helpTooltipElement.classList.add('hidden');
+            });
+
+          })
+
+            var addInteraction1 = function() {
+                let type = (kind.value == 'area' ? 'Polygon' : 'LineString');
+                draw = new ol.interaction.Draw({
+                    source: source,
+                    type: /** @type {ol.geom.GeometryType} */ (type),
+                    style: new ol.style.Style({
+                          fill: new ol.style.Fill({
+                              color: 'rgba(255, 255, 255, 0.2)'
+                          }),
+                          stroke: new ol.style.Stroke({
+                              color: 'rgba(0, 0, 0, 0.5)',
+                              lineDash: [10, 10],
+                              width: 2
+                          }),
+                          image: new ol.style.Circle({
+                              radius: 5,
+                              stroke: new ol.style.Stroke({
+                                  color: 'rgba(0, 0, 0, 0.7)'
+                              }),
+                              fill: new ol.style.Fill({
+                                  color: 'rgba(255, 255, 255, 0.2)'
+                              })
+                          })
+                      })
+                });
+                map.addInteraction(draw);
+                createMeasureTooltip();
+                createHelpTooltip();
+                var listener;
+                draw.on('drawstart',
+                        function(evt) {
+                            // set sketch
+                            sketch = evt.feature;
+                            var tooltipCoord = evt.coordinate;
+
+                            listener = sketch.getGeometry().on('change', function(evt) {
+                                var geom = evt.target;
+                                var output;
+                                if (geom instanceof ol.geom.Polygon) {
+                                    output = formatArea(geom);
+                                    tooltipCoord = geom.getInteriorPoint().getCoordinates();
+                                } else if (geom instanceof ol.geom.LineString) {
+                                    output = formatLength(geom);
+                                    tooltipCoord = geom.getLastCoordinate();
+                                }
+                                measureTooltipElement.innerHTML = output;
+                                measureTooltip.setPosition(tooltipCoord);
+                            });
+                        }, this);
+                draw.on('drawend',
+                        function() {
+                            measureTooltipElement.className = 'tooltip tooltip-static';
+                            measureTooltip.setOffset([0, -7]);
+                            // unset sketch
+                            sketch = null;
+                            // unset tooltip so that a new one can be created
+                            measureTooltipElement = null;
+                            createMeasureTooltip();
+                            ol.Observable.unByKey(listener);
+                        }, this);
+            }
+
+             // Creates a new help tooltip
+             var createHelpTooltip = function() {
+                 if (helpTooltipElement) {
+                     helpTooltipElement.parentNode.removeChild(helpTooltipElement);
+                 }
+                 console.log('createHelpTooltip');
+                 helpTooltipElement = document.createElement('div');
+                 helpTooltipElement.className = 'tooltip hidden';
+                 helpTooltip = new ol.Overlay({
+                     element: helpTooltipElement,
+                     offset: [15, 0],
+                     positioning: 'center-left'
+                 });
+                 map.addOverlay(helpTooltip);
+             }
+
+            //  Creates a new measure tooltip
+            var createMeasureTooltip = function() {
+                if (measureTooltipElement) {
+                    measureTooltipElement.parentNode.removeChild(measureTooltipElement);
+                }
+                measureTooltipElement = document.createElement('div');
+                measureTooltipElement.className = 'tooltip tooltip-measure';
+                measureTooltip = new ol.Overlay({
+                    element: measureTooltipElement,
+                    offset: [0, -15],
+                    positioning: 'bottom-center'
+                });
+                map.addOverlay(measureTooltip);
+              }
             //
             //
             //   /**
