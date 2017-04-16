@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Popup</title>
+        <link rel="stylesheet" href="https://openlayers.org/en/v4.1.0/css/ol.css" type="text/css">
+        <link href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+        <link href="https://cdn.bootcss.com/font-awesome/3.2.1/css/font-awesome.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="./style_sheets/popup.css">
+        <link rel="stylesheet" href="./style_sheets/tooltip.css">
+        <link rel="stylesheet" href="./style_sheets/measurement.css">
+        <!-- <link rel="stylesheet" href="./style_sheets/measurement.css"> -->
+        <!-- The line below is only needed for old environments like Internet Explorer and Android 4.x -->
+        <script src="https://cdn.polyfill.io/v2/polyfill.min.js?features=requestAnimationFrame,Element.prototype.classList,URL"></script>
+        <script src="https://openlayers.org/en/v4.1.0/build/ol.js"></script>
+        <script src="./scripts/miniroadrunner.js"></script>
+
+        <style>
+             html body {
+                 width: 100%;
+                 height: 100%;
+                 margin: 0px;
+                 padding: 0px;
+             }
+            /* 工具栏（功能栏 + 标记栏） */
+            #btn-group {
+                float: left;
+                width: 100%;
+                height: 40px;
+                position: fixed;
+                z-index: 102;
+                margin: 1% auto;
+                /* transform: translateY(-5%); */
+                margin-left: 7%;
+                /* float: right; */
+                text-align: center;
+            }
+
+            /*功能栏 和 标记栏 div*/
+            .button-group {
+                display: inline-block;
+                margin:2px;
+            }
+
+            /*按钮半透明样式*/
+            button {
+                filter:alpha(opacity=50);
+                -moz-opacity:0.5;
+                -khtml-opacity: 0.5;
+                opacity: 0.5;
+                background-color: lightblue;
+            }
+
+            /*measurement*/
+
+            /*标记栏 div*/
+            .dropdown-group {
+                height: 40px;
+                position: relative;
+                margin-left: -1%;
+            }
+
+            /*下拉按钮 （标记按钮）*/
+            .dropdown-button {
+                width: 40px;
+                position: relative;
+                left: 10px;
+                top: 1px;
+            }
+
+            /*下拉列表*/
+            ul.dropdown-menu {
+                min-width: 50px;
+            }
+
+            /*下拉按钮*/
+            .dropdownMenu-button {
+                width: 60px;
+            }
+
+            /* 点击下拉按钮 为按钮外层 div，增加 open 样式，显示下拉菜单 */
+            .open {
+                display: inline-block;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="btn-group" role="group" aria-label="...">
+            <!-- function -->
+            <div id="id-div-functionContainer" class="function-group button-group">
+                <!-- zoom out -->
+                <button id="id-button-zoomOut" class="zoom-button btn btn-default icon-zoom-out" type="button" title="zoom-out"></button>
+                <!-- zoom in -->
+                <button id="id-button-zoomIn" class="zoom-button btn btn-default icon-zoom-in" type="button" title="zoom-in"></button>
+                <!-- move point -->
+                <!-- <button id="id-button-movePoint" class="modify btn btn-default icon-move" type="button" name="button" title="move-point"></button> -->
+                <!-- clear -->
+                <button id="id-button-clear" class="modify btn btn-default icon-remove" type="button" name="button" title="remove"></button>
+                <!-- 测量 -->
+                <form class="form-measure">
+                    <!-- <label>Measurement type &nbsp;</label> -->
+                    <button id="id-button-measure" class="measurement-button btn btn-default" type="button" name="button">
+                        <img src="./imgs/ruler.png" class="measure-name" alt="line">
+                    </button>
+                    <select id="kind">
+                        <option value="length">Length (LineString)</option>
+                        <option value="area">Area (Polygon)</option>
+                    </select>
+                    <!-- <label class="checkbox">
+                        <input type="checkbox" id="geodesic">
+                        use geodesic measures
+                    </label> -->
+                </form>
+                <!-- 标点 线 面 -->
+                <form class="form-inline">
+                    <button id="id-button-marker" type="button" class="btn btn-default icon-map-marker">
+                        <span class="caret"></span>
+                    </button>
+                    <select id="type">
+                        <option value="Point">Point</option>
+                        <option value="LineString">LineString</option>
+                        <option value="Polygon">Polygon</option>
+                        <option value="Circle">Circle</option>
+                    </select>
+                </form>
+            </div>
+        </div>
+        <!-- <script src="./scripts/dropdownMenu.js"></script> -->
+
+        <div id="map" class="map"></div>
+        <div id="popup" class="ol-popup">
+            <a href="#" id="popup-closer" class="ol-popup-closer"></a>
+            <div id="popup-content"></div>
+        </div>
+        <script src="./scripts/zoom.js"></script>
+        <script>
+        // 坐标
+            // 实时坐标
+            var container = e('#popup');
+            var content = e('#popup-content');
+            var closer = e('#popup-closer');
+            // 覆盖
+            var overlay = new ol.Overlay(/** @type {olx.OverlayOptions} */ ({
+                element: container,
+                autoPan: true,
+                autoPanAnimation: {
+                    duration: 250
+                }
+            }));
+            // Add a click handler to hide the popu
+            closer.onclick = function() {
+                overlay.setPosition(undefined);
+                closer.blur();
+                return false;
+            };
+
+            var raster = new ol.layer.Tile({
+                source: new ol.source.OSM()
+            })
+
+            // var map = new ol.Map({
+            //     layers: [raster, vector],
+            //     target: 'map',
+            //     view: new ol.View({
+            //         center: [-11000000, 4600000],
+            //         zoom: 15
+            //     })
+            // });
+
+            var vector = new ol.layer.Vector({
+                source: source,
+                style: new ol.style.Style({
+                    fill: new ol.style.Fill({
+                    color: 'rgba(255, 255, 255, 0.2)'
+                }),
+                stroke: new ol.style.Stroke({
+                    color: '#ffcc33',
+                    width: 2
+                }),
+                image: new ol.style.Circle({
+                        radius: 7,
+                        fill: new ol.style.Fill({
+                            color: '#ffcc33'
+                        })
+                    })
+                })
+            });
+
+            // Create the map.
+            var map = new ol.Map({
+                layers: [
+                    new ol.layer.Tile({
+                        source: new ol.source.TileJSON({
+                            url: 'https://api.tiles.mapbox.com/v3/mapbox.natural-earth-hypso-bathy.json?secure',
+                            crossOrigin: 'anonymous'
+                        })
+                    }),
+                    raster,
+                    vector
+                ],
+                overlays: [overlay],
+                target: 'map',
+                view: new ol.View({
+                    center: [0, 0],
+                    zoom: 4
+                })
+            });
+            // Add a click handler to the map to render the popup.
+            map.on('singleclick', function(evt) {
+                var coordinate = evt.coordinate;
+                var hdms = ol.coordinate.toStringHDMS(ol.proj.transform(
+                    coordinate, 'EPSG:3857', 'EPSG:4326'));
+
+                content.innerHTML = '<p>You clicked here:</p><code>' + hdms +'</code>';
+                overlay.setPosition(coordinate);
+            });
+
+        // 画图形
+            var markButton = e('#id-button-marker')
+            bindEvent(markButton, 'click', function() {
+                // log('marker')
+                markButton
+            })
+
+            var features = new ol.Collection();
+            var featureOverlay = new ol.layer.Vector({
+                source: new ol.source.Vector({features: features}),
+                style: new ol.style.Style({
+                    fill: new ol.style.Fill({
+                        color: 'rgba(255, 255, 255, 0.2)'
+                    }),
+                    stroke: new ol.style.Stroke({
+                        color: '#ffcc33',
+                        width: 2
+                    }),
+                    image: new ol.style.Circle({
+                        radius: 7,
+                        fill: new ol.style.Fill({
+                            color: '#ffcc33'
+                        })
+                    })
+                })
+            });
+            featureOverlay.setMap(map);
+
+            var modify = new ol.interaction.Modify({
+                features: features,
+                // the SHIFT key must be pressed to delete vertices, so
+                // that new vertices can be drawn at the same position
+                // of existing vertices
+                deleteCondition: function(event) {
+                    return ol.events.condition.shiftKeyOnly(event) &&
+                    ol.events.condition.singleClick(event);
+                }
+            });
+            // map.addInteraction(modify);
+
+            var draw; // global so we can remove it later
+            var drawTypeSelect = e('#type');
+
+            var addInteraction = function() {
+                var value = drawTypeSelect.value
+                if (value !== 'None') {
+                    draw = new ol.interaction.Draw({
+                        features: features,
+                        type: /** @type {ol.geom.GeometryType} */ (typeSelect.value)
+                    });
+                }
+                map.addInteraction(draw);
+
+                draw.on('drawend', function(event) {
+                    console.log(event)
+                    // drawendEvent(event)
+                })
+            }
+
+            // var drawendEvent = function() {
+            //     map.removeInteraction(draw)
+            //     addInteraction()
+            // }
+
+            // Handle change event.
+            // typeSelect.onchange = function() {
+            //     map.removeInteraction(draw);
+            //     addInteraction();
+            // };
+            //
+            // addInteraction();
+
+        // 测量
+
+            // var wgs84Sphere = new ol.Sphere(6378137);
+            //
+            // var source = new ol.source.Vector();
+            //
+            // // Currently drawn feature.
+            // var sketch;
+            //
+            // // The help tooltip element.
+            // var helpTooltipElement;
+            //
+            // // Overlay to show the help messages.
+            // var helpTooltip;
+            //
+            // // The measure tooltip element.
+            // var measureTooltipElement;
+            //
+            // // Overlay to show the measurement.
+            // var measureTooltip;
+            //
+            // // Message to show when the user is drawing a polygon.
+            // var continuePolygonMsg = 'Click to continue drawing the polygon';
+            //
+            // // Message to show when the user is drawing a line.
+            // var continueLineMsg = 'Click to continue drawing the line';
+            //
+            // // Handle pointer move.
+            // var pointerMoveHandler = function(evt) {
+            //     if (evt.dragging) {
+            //         return;
+            //     }
+            //     var helpMsg = 'Click to start drawing';
+            //
+            //     if (sketch) {
+            //         var geom = (sketch.getGeometry());
+            //         if (geom instanceof ol.geom.Polygon) {
+            //             helpMsg = continuePolygonMsg;
+            //         } else if (geom instanceof ol.geom.LineString) {
+            //             helpMsg = continueLineMsg;
+            //         }
+            //     }
+            //
+            //     helpTooltipElement.innerHTML = helpMsg;
+            //     helpTooltip.setPosition(evt.coordinate);
+            //
+            //     helpTooltipElement.classList.remove('hidden');
+            // };
+            //
+            // var vector = new ol.layer.Vector({
+            //     source: source,
+            //     style: new ol.style.Style({
+            //         fill: new ol.style.Fill({
+            //         color: 'rgba(255, 255, 255, 0.2)'
+            //     }),
+            //     stroke: new ol.style.Stroke({
+            //         color: '#ffcc33',
+            //         width: 2
+            //     }),
+            //     image: new ol.style.Circle({
+            //             radius: 7,
+            //             fill: new ol.style.Fill({
+            //                 color: '#ffcc33'
+            //             })
+            //         })
+            //     })
+            // });
+            //
+            // map.on('pointermove', pointerMoveHandler);
+            //
+            // map.getViewport().addEventListener('mouseout', function() {
+            //     helpTooltipElement.classList.add('hidden');
+            // });
+            //
+            // var typeSelect = document.getElementById('type');
+            // var geodesicCheckbox = document.getElementById('geodesic');
+            //
+            // var draw; // global so we can remove it later
+            // // Format length output
+            // var formatLength = function(line) {
+            //       var length;
+            //       if (geodesicCheckbox.checked) {
+            //           var coordinates = line.getCoordinates();
+            //           length = 0;
+            //           var sourceProj = map.getView().getProjection();
+            //           for (var i = 0, ii = coordinates.length - 1; i < ii; ++i) {
+            //               var c1 = ol.proj.transform(coordinates[i], sourceProj, 'EPSG:4326');
+            //               var c2 = ol.proj.transform(coordinates[i + 1], sourceProj, 'EPSG:4326');
+            //               length += wgs84Sphere.haversineDistance(c1, c2);
+            //           }
+            //       } else {
+            //           length = Math.round(line.getLength() * 100) / 100;
+            //       }
+            //       var output;
+            //       if (length > 100) {
+            //           output = (Math.round(length / 1000 * 100) / 100) + ' ' + 'km';
+            //     } else {
+            //       output = (Math.round(length * 100) / 100) + ' ' + 'm';
+            //     }
+            //     return output;
+            // };
+            // // Format area output.
+            // var formatArea = function(polygon) {
+            //     var area;
+            //     if (geodesicCheckbox.checked) {
+            //         var sourceProj = map.getView().getProjection();
+            //         var geom = /** @type {ol.geom.Polygon} */(polygon.clone().transform(
+            //             sourceProj, 'EPSG:4326'));
+            //             var coordinates = geom.getLinearRing(0).getCoordinates();
+            //             area = Math.abs(wgs84Sphere.geodesicArea(coordinates));
+            //         } else {
+            //             area = polygon.getArea();
+            //         }
+            //         var output;
+            //         if (area > 10000) {
+            //             output = (Math.round(area / 1000000 * 100) / 100) + ' ' + 'km<sup>2</sup>';
+            //         } else {
+            //             output = (Math.round(area * 100) / 100) + ' ' + 'm<sup>2</sup>';
+            //         }
+            //         return output;
+            // };
+            //
+            // var addInteraction = function() {
+            //     var type = (typeSelect.value == 'area' ? 'Polygon' : 'LineString');
+            //     draw = new ol.interaction.Draw({
+            //         source: source,
+            //         type: /** @type {ol.geom.GeometryType} */ (type),
+            //         style: new ol.style.Style({
+            //               fill: new ol.style.Fill({
+            //                   color: 'rgba(255, 255, 255, 0.2)'
+            //               }),
+            //               stroke: new ol.style.Stroke({
+            //                   color: 'rgba(0, 0, 0, 0.5)',
+            //                   lineDash: [10, 10],
+            //                   width: 2
+            //               }),
+            //               image: new ol.style.Circle({
+            //                   radius: 5,
+            //                   stroke: new ol.style.Stroke({
+            //                       color: 'rgba(0, 0, 0, 0.7)'
+            //                   }),
+            //                   fill: new ol.style.Fill({
+            //                       color: 'rgba(255, 255, 255, 0.2)'
+            //                   })
+            //               })
+            //           })
+            //     });
+            //     map.addInteraction(draw);
+            //     createMeasureTooltip();
+            //     createHelpTooltip();
+            //     var listener;
+            //     draw.on('drawstart',
+            //             function(evt) {
+            //                 // set sketch
+            //                 sketch = evt.feature;
+            //                 var tooltipCoord = evt.coordinate;
+            //
+            //                 listener = sketch.getGeometry().on('change', function(evt) {
+            //                     var geom = evt.target;
+            //                     var output;
+            //                     if (geom instanceof ol.geom.Polygon) {
+            //                         output = formatArea(geom);
+            //                         tooltipCoord = geom.getInteriorPoint().getCoordinates();
+            //                     } else if (geom instanceof ol.geom.LineString) {
+            //                         output = formatLength(geom);
+            //                         tooltipCoord = geom.getLastCoordinate();
+            //                     }
+            //                     measureTooltipElement.innerHTML = output;
+            //                     measureTooltip.setPosition(tooltipCoord);
+            //                 });
+            //             }, this);
+            //     draw.on('drawend',
+            //             function() {
+            //                 measureTooltipElement.className = 'tooltip tooltip-static';
+            //                 measureTooltip.setOffset([0, -7]);
+            //                 // unset sketch
+            //                 sketch = null;
+            //                 // unset tooltip so that a new one can be created
+            //                 measureTooltipElement = null;
+            //                 createMeasureTooltip();
+            //                 ol.Observable.unByKey(listener);
+            //             }, this);
+            // }
+            //
+            //  // Creates a new help tooltip
+            //  var createHelpTooltip = function() {
+            //      if (helpTooltipElement) {
+            //          helpTooltipElement.parentNode.removeChild(helpTooltipElement);
+            //      }
+            //      helpTooltipElement = document.createElement('div');
+            //      helpTooltipElement.className = 'tooltip hidden';
+            //      helpTooltip = new ol.Overlay({
+            //          element: helpTooltipElement,
+            //          offset: [15, 0],
+            //          positioning: 'center-left'
+            //      });
+            //      map.addOverlay(helpTooltip);
+            //  }
+            //
+            // //  Creates a new measure tooltip
+            // var createMeasureTooltip = function() {
+            //     if (measureTooltipElement) {
+            //         measureTooltipElement.parentNode.removeChild(measureTooltipElement);
+            //     }
+            //     measureTooltipElement = document.createElement('div');
+            //     measureTooltipElement.className = 'tooltip tooltip-measure';
+            //     measureTooltip = new ol.Overlay({
+            //         element: measureTooltipElement,
+            //         offset: [0, -15],
+            //         positioning: 'bottom-center'
+            //     });
+            //     map.addOverlay(measureTooltip);
+            //   }
+            //
+            //
+            //   /**
+            //    * Let user change the geometry type.
+            //    */
+            //   typeSelect.onchange = function() {
+            //     map.removeInteraction(draw);
+            //     addInteraction();
+            //   };
+            //
+            //   addInteraction();
+        </script>
+    </body>
+</html>
